@@ -78,11 +78,24 @@ export const useInvalidateAllMCPTools = () => {
   return useInvalid(useAllMCPToolsKey)
 }
 
+const useAllSkillToolsKey = [NAME_SPACE, 'skillTools']
+export const useAllSkillTools = () => {
+  return useQuery<ToolWithProvider[]>({
+    queryKey: useAllSkillToolsKey,
+    queryFn: () => get<ToolWithProvider[]>('/workspaces/current/tools/skill'),
+  })
+}
+
+export const useInvalidateAllSkillTools = () => {
+  return useInvalid(useAllSkillToolsKey)
+}
+
 const useInvalidToolsKeyMap: Record<string, QueryKey> = {
   [CollectionType.builtIn]: useAllBuiltInToolsKey,
   [CollectionType.custom]: useAllCustomToolsKey,
   [CollectionType.workflow]: useAllWorkflowToolsKey,
   [CollectionType.mcp]: useAllMCPToolsKey,
+  [CollectionType.skill]: useAllSkillToolsKey,
 }
 export const useInvalidToolsByType = (type?: CollectionType | string) => {
   const queryKey = type ? useInvalidToolsKeyMap[type] : undefined
@@ -266,6 +279,123 @@ export const useRefreshMCPServerCode = () => {
     mutationKey: [NAME_SPACE, 'refresh-mcp-server-code'],
     mutationFn: (appID: string) => {
       return get<MCPServerDetail>(`apps/${appID}/server/refresh`)
+    },
+  })
+}
+
+// Skill Provider hooks
+export type SkillProvider = {
+  id: string
+  name: string
+  skill_identifier: string
+  description: string
+  icon?: string | { background: string, content: string }
+  source_type: 'git' | 'upload' | 'path'
+  source_url?: string
+  version: string
+  author?: string
+  has_scripts: boolean
+  enabled: boolean
+  created_at: string
+  updated_at?: string
+}
+
+export type SkillProviderDetail = SkillProvider & {
+  license?: string
+  compatibility?: Record<string, any>
+  full_content: string
+  scripts?: Array<{
+    name: string
+    description?: string
+    language: string
+    path: string
+    content?: string
+  }>
+}
+
+export const useSkillProviders = () => {
+  return useQuery<SkillProvider[]>({
+    queryKey: [NAME_SPACE, 'skill-providers'],
+    queryFn: () => get<SkillProvider[]>('/workspaces/current/tool-provider/skill/list'),
+  })
+}
+
+export const useInvalidateSkillProviders = () => {
+  return useInvalid([NAME_SPACE, 'skill-providers'])
+}
+
+export const useSkillProviderDetail = (providerId: string) => {
+  return useQuery<SkillProviderDetail>({
+    enabled: !!providerId,
+    queryKey: [NAME_SPACE, 'skill-provider-detail', providerId],
+    queryFn: () => get<SkillProviderDetail>(`/workspaces/current/tool-provider/skill/${providerId}`),
+  })
+}
+
+export const useInvalidateSkillProviderDetail = () => {
+  const queryClient = useQueryClient()
+  return (providerId: string) => {
+    queryClient.invalidateQueries({
+      queryKey: [NAME_SPACE, 'skill-provider-detail', providerId],
+    })
+  }
+}
+
+export const useInstallSkill = () => {
+  return useMutation({
+    mutationKey: [NAME_SPACE, 'install-skill'],
+    mutationFn: (payload: {
+      source_type: 'git' | 'path'
+      git_url?: string
+      git_branch?: string
+      path?: string
+      name?: string
+    }) => {
+      return post<SkillProvider>('/workspaces/current/tool-provider/skill/install', {
+        body: payload,
+      })
+    },
+  })
+}
+
+export const useUploadSkill = () => {
+  return useMutation({
+    mutationKey: [NAME_SPACE, 'upload-skill'],
+    mutationFn: (payload: { file: File, name?: string }) => {
+      const formData = new FormData()
+      formData.append('file', payload.file)
+      if (payload.name)
+        formData.append('name', payload.name)
+
+      return post<SkillProvider>('/workspaces/current/tool-provider/skill/upload', {
+        body: formData,
+      })
+    },
+  })
+}
+
+export const useDeleteSkill = ({
+  onSuccess,
+}: {
+  onSuccess?: () => void
+}) => {
+  return useMutation({
+    mutationKey: [NAME_SPACE, 'delete-skill'],
+    mutationFn: (providerId: string) => {
+      return del(`/workspaces/current/tool-provider/skill/${providerId}`)
+    },
+    onSuccess,
+  })
+}
+
+export const useValidateSkill = () => {
+  return useMutation({
+    mutationKey: [NAME_SPACE, 'validate-skill'],
+    mutationFn: (content: string) => {
+      return post<{ valid: boolean, name?: string, description?: string, error?: string }>(
+        '/workspaces/current/tool-provider/skill/validate',
+        { body: { content } },
+      )
     },
   })
 }

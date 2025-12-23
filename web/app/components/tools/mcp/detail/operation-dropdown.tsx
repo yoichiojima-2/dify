@@ -19,7 +19,7 @@ import { cn } from '@/utils/classnames'
 type Props = {
   inCard?: boolean
   onOpenChange?: (open: boolean) => void
-  onEdit: () => void
+  onEdit?: () => void
   onRemove: () => void
 }
 
@@ -61,16 +61,18 @@ const OperationDropdown: FC<Props> = ({
       </PortalToFollowElemTrigger>
       <PortalToFollowElemContent className="z-50">
         <div className="w-[160px] rounded-xl border-[0.5px] border-components-panel-border bg-components-panel-bg-blur p-1 shadow-lg backdrop-blur-sm">
-          <div
-            className="flex cursor-pointer items-center rounded-lg px-3 py-1.5 hover:bg-state-base-hover"
-            onClick={() => {
-              onEdit()
-              handleTrigger()
-            }}
-          >
-            <RiEditLine className="h-4 w-4 text-text-tertiary" />
-            <div className="system-md-regular ml-2 text-text-secondary">{t('tools.mcp.operation.edit')}</div>
-          </div>
+          {onEdit && (
+            <div
+              className="flex cursor-pointer items-center rounded-lg px-3 py-1.5 hover:bg-state-base-hover"
+              onClick={() => {
+                onEdit()
+                handleTrigger()
+              }}
+            >
+              <RiEditLine className="h-4 w-4 text-text-tertiary" />
+              <div className="system-md-regular ml-2 text-text-secondary">{t('tools.mcp.operation.edit')}</div>
+            </div>
+          )}
           <div
             className="group flex cursor-pointer items-center rounded-lg px-3 py-1.5 hover:bg-state-destructive-hover"
             onClick={() => {

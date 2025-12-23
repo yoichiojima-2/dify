@@ -53,6 +53,7 @@ class ToolProviderType(StrEnum):
     APP = auto()
     DATASET_RETRIEVAL = "dataset-retrieval"
     MCP = auto()
+    SKILL = auto()
 
     @classmethod
     def value_of(cls, value: str) -> "ToolProviderType":
