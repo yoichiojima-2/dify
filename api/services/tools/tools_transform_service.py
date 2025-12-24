@@ -26,7 +26,7 @@ from core.tools.plugin_tool.provider import PluginToolProviderController
 from core.tools.utils.encryption import create_provider_encrypter, create_tool_provider_encrypter
 from core.tools.workflow_as_tool.provider import WorkflowToolProviderController
 from core.tools.workflow_as_tool.tool import WorkflowTool
-from models.tools import ApiToolProvider, BuiltinToolProvider, MCPToolProvider, WorkflowToolProvider
+from models.tools import ApiToolProvider, BuiltinToolProvider, MCPToolProvider, SkillToolProvider, WorkflowToolProvider
 from services.plugin.plugin_service import PluginService
 
 logger = logging.getLogger(__name__)
@@ -282,6 +282,89 @@ class ToolTransformService:
                 output_schema=tool.outputSchema or {},
             )
             for tool in tools
+        ]
+
+    @staticmethod
+    def skill_provider_to_user_provider(
+        db_provider: SkillToolProvider,
+        for_list: bool = False,
+        user_name: str | None = None,
+    ) -> ToolProviderApiEntity:
+        """Convert skill provider to user provider entity."""
+        # Use provided user_name to avoid N+1 query
+        if user_name is None:
+            user = db_provider.load_user()
+            user_name = user.name if user else "Anonymous"
+
+        # Get skill tools from scripts
+        tools = ToolTransformService.skill_scripts_to_user_tools(db_provider, user_name=user_name)
+
+        # Default icon if not set
+        icon = db_provider.icon or {"background": "#6366f1", "content": "🎯"}
+
+        return ToolProviderApiEntity(
+            id=db_provider.id if for_list else db_provider.skill_identifier,
+            author=db_provider.author or user_name or "Anonymous",
+            name=db_provider.name,
+            description=I18nObject(
+                en_US=db_provider.description or "",
+                zh_Hans=db_provider.description or "",
+            ),
+            icon=icon,
+            label=I18nObject(
+                en_US=db_provider.name,
+                zh_Hans=db_provider.name,
+            ),
+            type=ToolProviderType.SKILL,
+            masked_credentials={},
+            is_team_authorization=False,
+            allow_delete=True,
+            tools=tools,
+            labels=[],
+        )
+
+    @staticmethod
+    def skill_scripts_to_user_tools(
+        skill_provider: SkillToolProvider, user_name: str | None = None
+    ) -> list[ToolApiEntity]:
+        """Convert skill scripts to tool entities."""
+        if user_name is None:
+            user = skill_provider.load_user()
+            user_name = user.name if user else "Anonymous"
+
+        scripts = skill_provider.scripts
+        if not scripts:
+            return []
+
+        return [
+            ToolApiEntity(
+                author=user_name or "Anonymous",
+                name=script.get("name", "unknown"),
+                label=I18nObject(
+                    en_US=script.get("name", "unknown"),
+                    zh_Hans=script.get("name", "unknown"),
+                ),
+                description=I18nObject(
+                    en_US=script.get("description", ""),
+                    zh_Hans=script.get("description", ""),
+                ),
+                parameters=[
+                    ToolParameter(
+                        name="input",
+                        label=I18nObject(en_US="Input", zh_Hans="Input"),
+                        human_description=I18nObject(
+                            en_US="Input data for the script",
+                            zh_Hans="脚本输入数据",
+                        ),
+                        type=ToolParameter.ToolParameterType.STRING,
+                        form=ToolParameter.ToolParameterForm.LLM,
+                        required=False,
+                    )
+                ],
+                labels=[],
+                output_schema={},
+            )
+            for script in scripts
         ]
 
     @classmethod

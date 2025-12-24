@@ -22,6 +22,8 @@ from core.tools.mcp_tool.provider import MCPToolProviderController
 from core.tools.mcp_tool.tool import MCPTool
 from core.tools.plugin_tool.provider import PluginToolProviderController
 from core.tools.plugin_tool.tool import PluginTool
+from core.tools.skill_tool.provider import SkillToolProviderController
+from core.tools.skill_tool.tool import SkillTool
 from core.tools.utils.uuid_utils import is_valid_uuid
 from core.tools.workflow_as_tool.provider import WorkflowToolProviderController
 from core.workflow.runtime.variable_pool import VariablePool
@@ -29,6 +31,7 @@ from extensions.ext_database import db
 from models.provider_ids import ToolProviderID
 from services.enterprise.plugin_manager_service import PluginCredentialType
 from services.tools.mcp_tools_manage_service import MCPToolManageService
+from services.tools.skill_tools_manage_service import SkillToolManageService
 
 if TYPE_CHECKING:
     from core.workflow.nodes.tool.entities import ToolEntity
@@ -165,7 +168,7 @@ class ToolManager:
         invoke_from: InvokeFrom = InvokeFrom.DEBUGGER,
         tool_invoke_from: ToolInvokeFrom = ToolInvokeFrom.AGENT,
         credential_id: str | None = None,
-    ) -> Union[BuiltinTool, PluginTool, ApiTool, WorkflowTool, MCPTool]:
+    ) -> Union[BuiltinTool, PluginTool, ApiTool, WorkflowTool, MCPTool, SkillTool]:
         """
         get the tool runtime
 
@@ -357,6 +360,8 @@ class ToolManager:
             return cls.get_plugin_provider(provider_id, tenant_id).get_tool(tool_name)
         elif provider_type == ToolProviderType.MCP:
             return cls.get_mcp_provider_controller(tenant_id, provider_id).get_tool(tool_name)
+        elif provider_type == ToolProviderType.SKILL:
+            return cls.get_skill_provider_controller(tenant_id, provider_id).get_tool(tool_name)
         else:
             raise ToolProviderNotFoundError(f"provider type {provider_type.value} not found")
 
@@ -656,7 +661,7 @@ class ToolManager:
 
         filters = []
         if not typ:
-            filters.extend(["builtin", "api", "workflow", "mcp"])
+            filters.extend(["builtin", "api", "workflow", "mcp", "skill"])
         else:
             filters.append(typ)
 
@@ -765,6 +770,12 @@ class ToolManager:
                 for mcp_provider in mcp_providers:
                     result_providers[f"mcp_provider.{mcp_provider.name}"] = mcp_provider
 
+            if "skill" in filters:
+                skill_service = SkillToolManageService(session=session)
+                skill_providers = skill_service.list_providers_for_api(tenant_id=tenant_id, for_list=True)
+                for skill_provider in skill_providers:
+                    result_providers[f"skill_provider.{skill_provider.name}"] = skill_provider
+
         return BuiltinToolProviderSort.sort(list(result_providers.values()))
 
     @classmethod
@@ -824,6 +835,26 @@ class ToolManager:
                 raise ToolProviderNotFoundError(f"mcp provider {provider_id} not found")
 
         controller = MCPToolProviderController.from_db(provider)
+
+        return controller
+
+    @classmethod
+    def get_skill_provider_controller(cls, tenant_id: str, provider_id: str) -> SkillToolProviderController:
+        """
+        get the skill provider
+
+        :param tenant_id: the id of the tenant
+        :param provider_id: the id of the provider
+
+        :return: the provider controller
+        """
+        with Session(db.engine) as session:
+            skill_service = SkillToolManageService(session=session)
+            provider = skill_service.get_provider(provider_id=provider_id, tenant_id=tenant_id)
+            if provider is None:
+                raise ToolProviderNotFoundError(f"skill provider {provider_id} not found")
+
+        controller = SkillToolProviderController.from_db(provider)
 
         return controller
 
@@ -972,6 +1003,18 @@ class ToolManager:
             return {"background": "#252525", "content": "\ud83d\ude01"}
 
     @classmethod
+    def generate_skill_tool_icon_url(cls, tenant_id: str, provider_id: str) -> Mapping[str, str] | str:
+        try:
+            with Session(db.engine) as session:
+                skill_service = SkillToolManageService(session=session)
+                provider = skill_service.get_provider(provider_id=provider_id, tenant_id=tenant_id)
+                if provider and provider.icon:
+                    return provider.icon
+                return {"background": "#6366f1", "content": "🎯"}
+        except Exception:
+            return {"background": "#6366f1", "content": "🎯"}
+
+    @classmethod
     def get_tool_icon(
         cls,
         tenant_id: str,
@@ -1009,6 +1052,8 @@ class ToolManager:
             raise ValueError(f"plugin provider {provider_id} not found")
         elif provider_type == ToolProviderType.MCP:
             return cls.generate_mcp_tool_icon_url(tenant_id, provider_id)
+        elif provider_type == ToolProviderType.SKILL:
+            return cls.generate_skill_tool_icon_url(tenant_id, provider_id)
         else:
             raise ValueError(f"provider type {provider_type} not found")
 

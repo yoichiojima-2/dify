@@ -448,6 +448,12 @@ class FunctionCallAgentRunner(BaseAgentRunner):
 
     def _organize_prompt_messages(self):
         prompt_template = self.app_config.prompt_template.simple_prompt_template or ""
+
+        # Inject skill context for progressive disclosure
+        skill_context = self.get_skill_context_prompt()
+        if skill_context:
+            prompt_template = skill_context + prompt_template
+
         self.history_prompt_messages = self._init_system_message(prompt_template, self.history_prompt_messages)
         query_prompt_messages = self._organize_user_query(self.query or "", [])
 

@@ -32,6 +32,11 @@ class CotChatAgentRunner(CotAgentRunner):
             .replace("{{tool_names}}", ", ".join([tool.name for tool in self._prompt_messages_tools]))
         )
 
+        # Inject skill context for progressive disclosure
+        skill_context = self.get_skill_context_prompt()
+        if skill_context:
+            system_prompt = skill_context + system_prompt
+
         return SystemPromptMessage(content=system_prompt)
 
     def _organize_user_query(self, query, prompt_messages: list[PromptMessage]) -> list[PromptMessage]:

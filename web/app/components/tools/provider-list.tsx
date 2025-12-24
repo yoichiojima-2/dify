@@ -22,6 +22,7 @@ import { ToolTypeEnum } from '../workflow/block-selector/types'
 import Marketplace from './marketplace'
 import { useMarketplace } from './marketplace/hooks'
 import MCPList from './mcp'
+import SkillList from './skill'
 
 const getToolType = (type: string) => {
   switch (type) {
@@ -53,6 +54,7 @@ const ProviderList = () => {
     { value: 'api', text: t('tools.type.custom') },
     { value: 'workflow', text: t('tools.type.workflow') },
     { value: 'mcp', text: 'MCP' },
+    { value: 'skill', text: t('tools.type.skill') },
   ]
   const [tagFilterValue, setTagFilterValue] = useState<string[]>([])
   const handleTagsChange = (value: string[]) => {
@@ -145,7 +147,7 @@ const ProviderList = () => {
               options={options}
             />
             <div className="flex items-center gap-2">
-              {activeTab !== 'mcp' && (
+              {activeTab !== 'mcp' && activeTab !== 'skill' && (
                 <LabelFilter value={tagFilterValue} onChange={handleTagsChange} />
               )}
               <Input
@@ -158,7 +160,7 @@ const ProviderList = () => {
               />
             </div>
           </div>
-          {activeTab !== 'mcp' && (
+          {activeTab !== 'mcp' && activeTab !== 'skill' && (
             <div className={cn(
               'relative grid shrink-0 grid-cols-1 content-start gap-4 px-12 pb-4 pt-2 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4',
               !filteredCollectionList.length && activeTab === 'workflow' && 'grow',
@@ -208,6 +210,9 @@ const ProviderList = () => {
           )}
           {activeTab === 'mcp' && (
             <MCPList searchText={keywords} />
+          )}
+          {activeTab === 'skill' && (
+            <SkillList searchText={keywords} />
           )}
         </div>
       </div>

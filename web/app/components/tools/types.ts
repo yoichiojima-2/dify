@@ -34,6 +34,7 @@ export enum CollectionType {
   model = 'model',
   workflow = 'workflow',
   mcp = 'mcp',
+  skill = 'skill',
   datasource = 'datasource',
   trigger = 'trigger',
 }

@@ -22,7 +22,7 @@ class ToolApiEntity(BaseModel):
     output_schema: Mapping[str, object] = Field(default_factory=dict)
 
 
-ToolProviderTypeApiLiteral = Literal["builtin", "api", "workflow", "mcp"] | None
+ToolProviderTypeApiLiteral = Literal["builtin", "api", "workflow", "mcp", "skill"] | None
 
 
 class ToolProviderApiEntity(BaseModel):

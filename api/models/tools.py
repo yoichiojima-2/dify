@@ -366,6 +366,95 @@ class MCPToolProvider(TypeBase):
         return MCPProviderEntity.from_db_model(self)
 
 
+class SkillToolProvider(TypeBase):
+    """
+    The table stores the skill providers (Anthropic Agent Skills).
+    """
+
+    __tablename__ = "tool_skill_providers"
+    __table_args__ = (
+        sa.PrimaryKeyConstraint("id", name="tool_skill_provider_pkey"),
+        sa.UniqueConstraint("tenant_id", "name", name="unique_skill_provider_name"),
+        sa.UniqueConstraint("tenant_id", "skill_identifier", name="unique_skill_provider_identifier"),
+    )
+
+    # Required fields (no defaults) must come first
+    name: Mapped[str] = mapped_column(String(128), nullable=False)
+    skill_identifier: Mapped[str] = mapped_column(String(64), nullable=False)
+    tenant_id: Mapped[str] = mapped_column(StringUUID, nullable=False)
+    user_id: Mapped[str] = mapped_column(StringUUID, nullable=False)
+    source_type: Mapped[str] = mapped_column(String(32), nullable=False)  # 'git', 'upload', 'path'
+    source_hash: Mapped[str] = mapped_column(String(64), nullable=False)  # Hash for change detection
+    description: Mapped[str] = mapped_column(LongText, nullable=False)
+    full_content: Mapped[str] = mapped_column(LongText, nullable=False)
+
+    # Fields with defaults
+    id: Mapped[str] = mapped_column(
+        StringUUID, insert_default=lambda: str(uuid4()), default_factory=lambda: str(uuid4()), init=False
+    )
+    icon: Mapped[str | None] = mapped_column(String(255), nullable=True, default=None)
+    source_url: Mapped[str | None] = mapped_column(LongText, nullable=True, default=None)  # Git URL or local path
+    version: Mapped[str] = mapped_column(String(32), nullable=False, default="1.0.0")
+    author: Mapped[str | None] = mapped_column(String(128), nullable=True, default=None)
+    skill_license: Mapped[str | None] = mapped_column(String(64), nullable=True, default=None)
+    compatibility: Mapped[str | None] = mapped_column(LongText, nullable=True, default=None)
+    allowed_tools: Mapped[str | None] = mapped_column(LongText, nullable=True, default=None)
+    metadata_extra: Mapped[str | None] = mapped_column(LongText, nullable=True, default=None)
+    has_scripts: Mapped[bool] = mapped_column(sa.Boolean, nullable=False, default=False)
+    scripts_manifest: Mapped[str | None] = mapped_column(LongText, nullable=True, default=None)  # JSON: list of scripts
+    enabled: Mapped[bool] = mapped_column(sa.Boolean, nullable=False, server_default=sa.text("true"), default=True)
+
+    created_at: Mapped[datetime] = mapped_column(
+        sa.DateTime, nullable=False, server_default=func.current_timestamp(), init=False
+    )
+    updated_at: Mapped[datetime] = mapped_column(
+        sa.DateTime,
+        nullable=False,
+        server_default=func.current_timestamp(),
+        onupdate=func.current_timestamp(),
+        init=False,
+    )
+
+    def load_user(self) -> Account | None:
+        return db.session.query(Account).where(Account.id == self.user_id).first()
+
+    @property
+    def scripts(self) -> list[dict[str, Any]]:
+        if not self.scripts_manifest:
+            return []
+        try:
+            return json.loads(self.scripts_manifest)
+        except (json.JSONDecodeError, TypeError):
+            return []
+
+    @property
+    def compatibility_dict(self) -> dict[str, Any]:
+        if not self.compatibility:
+            return {}
+        try:
+            return json.loads(self.compatibility)
+        except (json.JSONDecodeError, TypeError):
+            return {}
+
+    @property
+    def allowed_tools_list(self) -> list[str]:
+        if not self.allowed_tools:
+            return []
+        try:
+            return json.loads(self.allowed_tools)
+        except (json.JSONDecodeError, TypeError):
+            return []
+
+    @property
+    def metadata_dict(self) -> dict[str, Any]:
+        if not self.metadata_extra:
+            return {}
+        try:
+            return json.loads(self.metadata_extra)
+        except (json.JSONDecodeError, TypeError):
+            return {}
+
+
 class ToolModelInvoke(TypeBase):
     """
     store the invoke logs from tool invoke

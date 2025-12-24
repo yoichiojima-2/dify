@@ -36,6 +36,7 @@ from core.prompt.utils.extract_thread_messages import extract_thread_messages
 from core.tools.__base.tool import Tool
 from core.tools.entities.tool_entities import (
     ToolParameter,
+    ToolProviderType,
 )
 from core.tools.tool_manager import ToolManager
 from core.tools.utils.dataset_retriever_tool import DatasetRetrieverTool
@@ -116,6 +117,7 @@ class BaseAgentRunner(AppRunner):
         self.files = application_generate_entity.files if ModelFeature.VISION in features else []
         self.query: str | None = ""
         self._current_thoughts: list[PromptMessage] = []
+        self._skill_contexts: list[str] = []
 
     def _repack_app_generate_entity(
         self, app_generate_entity: AgentChatAppGenerateEntity
@@ -218,6 +220,7 @@ class BaseAgentRunner(AppRunner):
         """
         tool_instances = {}
         prompt_messages_tools = []
+        skill_provider_ids: set[str] = set()
 
         for tool in self.app_config.agent.tools or [] if self.app_config.agent else []:
             try:
@@ -230,6 +233,13 @@ class BaseAgentRunner(AppRunner):
             # save prompt tool
             prompt_messages_tools.append(prompt_tool)
 
+            # collect skill provider IDs for context injection
+            if tool.provider_type == ToolProviderType.SKILL:
+                skill_provider_ids.add(tool.provider_id)
+
+        # load skill contexts for progressive disclosure
+        self._skill_contexts = self._load_skill_contexts(skill_provider_ids)
+
         # convert dataset tools into ModelRuntime Tool format
         for dataset_tool in self.dataset_tools:
             prompt_tool = self._convert_dataset_retriever_tool_to_prompt_message_tool(dataset_tool)
@@ -239,6 +249,48 @@ class BaseAgentRunner(AppRunner):
             tool_instances[dataset_tool.entity.identity.name] = dataset_tool
 
         return tool_instances, prompt_messages_tools
+
+    def _load_skill_contexts(self, skill_provider_ids: set[str]) -> list[str]:
+        """
+        Load skill contexts for progressive disclosure.
+        Returns full skill content for each skill provider.
+        """
+        if not skill_provider_ids:
+            return []
+
+        contexts = []
+        for provider_id in skill_provider_ids:
+            try:
+                controller = ToolManager.get_skill_provider_controller(
+                    tenant_id=self.tenant_id,
+                    provider_id=provider_id,
+                )
+                # Get Level 2 content (full SKILL.md body)
+                context = controller.get_context_injection(level=2)
+                contexts.append(context)
+            except Exception as e:
+                logger.warning("Failed to load skill context for provider %s: %s", provider_id, e)
+                continue
+
+        return contexts
+
+    def get_skill_context_prompt(self) -> str:
+        """
+        Get the combined skill context for injection into agent prompt.
+        """
+        if not self._skill_contexts:
+            return ""
+
+        contexts = "\n\n---\n\n".join(self._skill_contexts)
+        return f"""## Available Skills
+
+The following skills are available and should be used when relevant:
+
+{contexts}
+
+---
+
+"""
 
     def update_prompt_message_tool(self, tool: Tool, prompt_tool: PromptMessageTool) -> PromptMessageTool:
         """
